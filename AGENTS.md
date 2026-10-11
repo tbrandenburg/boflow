@@ -1,4 +1,4 @@
-# Boflow agent operating guide
+# boflow agent operating guide
 
 Read SCOPE.md before changing code or enrolling machines. Implement only what its
 acceptance criteria require. Prefer existing tools and explicit configuration.
@@ -36,7 +36,7 @@ as separate steps. Everyday Make commands: `setup`, `approve`, `open`, `status`,
 `lock BOFLOW_DIR=...`. Development: `check`. Removed Make wrappers: bootstrap, init-home,
 enroll, register-user, login, update-system-tools, and the redundant uninstall alias. The corresponding installed CLI
 commands remain for repair/internal startup; they are not an alternative onboarding.
-Boflow inputs use BOFLOW_: BOFLOW_STATE, BOFLOW_DIR, BOFLOW_PYTHON.
+boflow inputs use BOFLOW_: BOFLOW_STATE, BOFLOW_DIR, BOFLOW_PYTHON.
 BOFLOW_PORT_BASE/CLI --port-base remain for explicit low-level registration tests;
 guided setup chooses free ports automatically. Preserve OS/external-tool names.
 For developer environment setup without native changes: `uv sync --locked`.
@@ -135,11 +135,11 @@ pyproject changes configure its managed environment. Project-specific kernel
 management is outside v1; normal notebook functionality remains available.
 
 No extra login is entered locally. Node-RED is unauthenticated on loopback, which
-is accessible to OTHER local accounts: household trust is required. index.html
-contains the Jupyter token and must not be served publicly. Provider credentials
-and optional agents CLIs (opencode/pi/gh/sandboxing, depending on package use)
-are independent prerequisites. Never report these integrations usable just because
-their Node-RED package installed.
+is accessible to OTHER local accounts: household trust is required. The browser page at
+`$HOME/boflow/index.html` contains the Jupyter token and is owner-only; never publish
+it or serve it publicly. Provider credentials and optional agents CLIs
+(opencode/pi/gh/sandboxing, depending on package use) are independent prerequisites.
+Never report these integrations usable just because their Node-RED package installed.
 
 Optional shell PATH (substitute the selected state path):
 `$HOME/.local/share/boflow/tools-npm/node_modules/.bin`

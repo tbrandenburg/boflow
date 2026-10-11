@@ -1,6 +1,6 @@
 # First release contract
 
-Boflow installs and maintains native, account-local household tools on macOS Intel,
+boflow installs and maintains native, account-local household tools on macOS Intel,
 macOS Apple Silicon, and Ubuntu x86_64/ARM64. Support is capability checked; no
 claim of compatibility with every OS release. Unsupported platforms fail clearly.
 

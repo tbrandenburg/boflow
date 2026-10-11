@@ -157,7 +157,7 @@ def approve(app, value=None):
                 raise Error('Existing deploy key has write access. Revoke it and retry.')
             print('This read-only key is already approved.')
             return
-    payload = json.dumps({'title': 'Boflow ' + data['label'], 'key': data['key'], 'read_only': True})
+    payload = json.dumps({'title': 'boflow ' + data['label'], 'key': data['key'], 'read_only': True})
     run(['gh', 'api', f"repos/{data['repo']}/keys", '--method', 'POST', '--input', '-'],
         input=payload, stdout=subprocess.DEVNULL)
     print('Approved. Member setup can now continue. Keep the administrator’s gh authorization active.')

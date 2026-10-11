@@ -1,11 +1,11 @@
-# Boflow
+# boflow
 
 **Shared household automation. Personal tools on each account.**
 
 [![Check](https://github.com/tbrandenburg/boflow/actions/workflows/check.yml/badge.svg)](https://github.com/tbrandenburg/boflow/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](/LICENSE)
 
-Boflow installs and updates **Node-RED, JupyterLab, and CLI tools** for individual
+boflow installs and updates **Node-RED, JupyterLab, and CLI tools** for individual
 accounts on Ubuntu and macOS. Keep shared flows and pinned dependencies in one
 **private household GitHub repository**; each account keeps its own work and secrets.
 Updates run at graphical login or on demand, without an always-on coordinator.
@@ -70,7 +70,7 @@ is set locally in the household checkout if absent; HTTPS Git authentication is
 configured through `gh auth setup-git`. No administrator token is sent to members.
 
 **Join:** no GitHub login is required. Setup prints one PUBLIC `boflow1:` enrollment
-request. Share it with the administrator, who runs this from their Boflow checkout:
+request. Share it with the administrator, who runs this from their boflow checkout:
 
 ```sh
 make approve
@@ -134,7 +134,7 @@ There is no periodic updater or OS upgrade job.
 | `BOFLOW_DIR` | Makefile household working-checkout input |
 | `BOFLOW_PYTHON` | Makefile interpreter override; defaults to the local venv if present |
 
-Boflow-owned inputs use `BOFLOW_`. External tools and the OS retain their required
+boflow-owned inputs use `BOFLOW_`. External tools and the OS retain their required
 environment names. Set `BOFLOW_STATE` consistently when using a custom installation.
 
 The private repository contains `home.yml`, Node-RED/npm manifests and lockfiles,
@@ -167,7 +167,9 @@ later shared-flow update. See the [publishing guide](/AGENTS.md#5-publish-shared
 
 Services bind to `127.0.0.1`. Node-RED is unauthenticated and reachable by other
 local accounts: this is a trusted-household setup. The private local page contains
-the Jupyter token; do not publish it or paste raw service logs into shared channels.
+the Jupyter token at `~/boflow/index.html`, with owner-only file access; do not
+publish it or paste raw service logs into shared channels. Keeping the page outside
+hidden state directories also lets confined browsers such as Firefox Snap open it.
 
 For remote administration, explicitly enable OS SSH and forward the relevant
 account port, for example `ssh -L 11880:127.0.0.1:11880 ACCOUNT@IP`. Remote notebook
@@ -197,7 +199,7 @@ CI checks orchestration and application startup on Linux/macOS. The Ubuntu nativ
 roundtrip has been exercised with real user services: registration, authenticated
 application checks, unchanged updates, managed-only restart, offline login, and
 uninstall. `make acceptance` uses disposable local Git repositories and removes
-its test state; it requires no existing Boflow service files and a working user manager.
+its test state; it requires no existing boflow service files and a working user manager.
 
 Actual logout/reboot, macOS native sessions, simultaneous accounts, GitHub key
 authorization, and administrator package consent need separate target-machine

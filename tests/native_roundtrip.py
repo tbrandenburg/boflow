@@ -20,7 +20,7 @@ def run(args, cwd=None, env=None):
     result = subprocess.run(list(map(str, args)), cwd=cwd, env=env,
                             capture_output=True, text=True, timeout=1800)
     if result.returncode:
-        errors = [line for line in result.stderr.splitlines() if line.startswith('Boflow:')]
+        errors = [line for line in result.stderr.splitlines() if line.startswith('boflow:')]
         raise RuntimeError(f'{args[0]} failed ({result.returncode}): ' + '; '.join(errors))
     return result.stdout.strip()
 
@@ -43,12 +43,12 @@ def main():
     units = [Path.home() / '.config/systemd/user' / f'boflow-{role}.service' for role in b.ROLES]
     startup = Path.home() / '.config/autostart/boflow.desktop'
     if any(path.exists() for path in [*units, startup]):
-        raise RuntimeError('Existing Boflow service files; use a disposable account.')
+        raise RuntimeError('Existing boflow service files; use a disposable account.')
     for role in b.ROLES:
         result = subprocess.run(['systemctl', '--user', 'show', f'boflow-{role}.service',
                                  '--property=LoadState', '--value'], capture_output=True, text=True, timeout=10)
         if result.returncode or result.stdout.strip() != 'not-found':
-            raise RuntimeError('User manager unavailable or an existing Boflow unit is loaded.')
+            raise RuntimeError('User manager unavailable or an existing boflow unit is loaded.')
     with tempfile.TemporaryDirectory(prefix='boflow-acceptance-') as temporary:
         root = Path(temporary)
         product = root / 'product-source'

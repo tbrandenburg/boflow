@@ -361,8 +361,9 @@ class App:
         if self.settings.get('node_path') != str(node):
             changed.update(ROLES)
         # Stop before changing dependencies or flows. Preparation never stops working services.
-        for role in changed:
-            self.service('stop', role, required=False)
+        if self.settings.get('registered'):
+            for role in changed:
+                self.service('stop', role, required=False)
         for name, target in pointers.items():
             link(target, self.state / name)
         managed = self.state / 'managed'
@@ -429,7 +430,7 @@ class App:
             else:
                 def quote(value):
                     return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%').replace('$', '$$') + '"'
-                text = ('[Unit]\nDescription=Boflow ' + role + '\nPartOf=graphical-session.target\n'
+                text = ('[Unit]\nDescription=boflow ' + role + '\nPartOf=graphical-session.target\n'
                         '[Service]\nType=simple\nExecStart=' + ' '.join(map(quote, args)) + '\n'
                         'Environment=' + quote('BOFLOW_STATE=' + str(self.state)) + '\n'
                         'Environment=' + quote('PATH=' + env['PATH']) + '\n'
@@ -468,7 +469,7 @@ class App:
             # Desktop autostart supplies the real user's graphical session environment.
             command = '"' + str(self.bin).replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$') + '" login'
             write(Path.home() / '.config/autostart/boflow.desktop',
-                  '[Desktop Entry]\nType=Application\nName=Boflow\nExec=' + command + '\nTerminal=false\n')
+                  '[Desktop Entry]\nType=Application\nName=boflow\nExec=' + command + '\nTerminal=false\n')
         for role in ROLES:
             self.service('start', role, required=False)
         self.health()
@@ -575,11 +576,18 @@ class App:
                  ('Dashboard', f'http://127.0.0.1:{ports["managed"]}/dashboard/')]
         token = (self.state / 'jupyter-token').read_text().strip()
         links.append(('JupyterLab', f'http://127.0.0.1:{ports["jupyter"]}/lab?token={token}'))
-        page = '<!doctype html><meta charset="utf-8"><title>Boflow</title><h1>Your household tools</h1>'
+        page = '<!doctype html><meta charset="utf-8"><title>boflow</title><h1>Your household tools</h1>'
         page += ''.join(f'<p><a href="{html.escape(url, quote=True)}">{name}</a></p>' for name, url in links)
         page += '<p>Local account access. Remote administration uses SSH tunnels.</p>'
-        write(self.state / 'index.html', page)
-        return self.state / 'index.html'
+        directory = Path.home() / 'boflow'
+        if directory.is_symlink():
+            raise Error('Refusing to write the private tools page through a ~/boflow symlink.')
+        directory.mkdir(mode=0o700, exist_ok=True)
+        if not directory.is_dir() or directory.stat().st_uid != os.getuid():
+            raise Error('The ~/boflow tools-page directory must be owned by this account.')
+        path = directory / 'index.html'
+        write(path, page)
+        return path
 
     def login(self):
         if not self.settings.get('registered'):
@@ -655,7 +663,7 @@ def init_home(repo, directory):
             raise Error('Household working checkout has changes. Review and commit them before resuming init-home.')
         # Only starter paths. No git add . that might publish unrelated secrets.
         run(['git', '-C', directory, 'add', '--', *STARTER_FILES])
-        run(['git', '-C', directory, 'commit', '-m', 'Initialize private Boflow household'])
+        run(['git', '-C', directory, 'commit', '-m', 'Initialize private boflow household'])
     probe = subprocess.run(['gh', 'repo', 'view', repo, '--json', 'visibility'], text=True,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
     if probe.returncode == 0:
@@ -675,7 +683,7 @@ def init_home(repo, directory):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Boflow: account-local household tools')
+    parser = argparse.ArgumentParser(description='boflow: account-local household tools')
     sub = parser.add_subparsers(dest='command', required=True)
     for cmd in ('setup', 'approve', 'install-launcher', 'update', 'login', 'status', 'doctor', 'logs', 'open', 'remove-user'):
         sub.add_parser(cmd)
@@ -754,5 +762,5 @@ if __name__ == '__main__':
     try:
         main()
     except (Error, OSError, ValueError, KeyError, EOFError, KeyboardInterrupt) as exc:
-        print(f'Boflow: {exc}', file=sys.stderr)
+        print(f'boflow: {exc}', file=sys.stderr)
         sys.exit(1)

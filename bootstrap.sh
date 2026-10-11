@@ -20,4 +20,4 @@ umask 077
 mkdir -p "$state_dir/bin"
 uv sync --locked --project "$product_dir"
 "$product_dir/.venv/bin/python" "$product_dir/src/boflow.py" install-launcher
-printf 'Boflow environment ready.\n'
+printf 'boflow environment ready.\n'

@@ -132,6 +132,11 @@ class UpdateTests(Fixture):
         stops = [c.args[1] for c in service.call_args_list if c.args[0] == 'stop']
         self.assertEqual(stops, ['managed'])
 
+    def test_initial_registration_does_not_stop_unloaded_services(self):
+        with patch.object(self.app, 'service') as service:
+            self.apply()
+        service.assert_not_called()
+
     def test_unchanged_registered_account_has_no_stops(self):
         self.apply()
         self.app.settings['registered'] = True
@@ -236,9 +241,14 @@ class NativeAndAccessTests(Fixture):
             self.app.serve('jupyter')
         token = (self.app.state / 'jupyter-token').read_text()
         self.assertNotIn(token, str(execute.call_args))
-        page = self.app.landing()
+        home = self.root / 'home'
+        home.mkdir()
+        with patch.object(b.Path, 'home', return_value=home):
+            page = self.app.landing()
         self.assertIn(token, page.read_text())
         self.assertEqual(page.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(page.parent, home / 'boflow')
+        self.assertEqual(page.parent.stat().st_mode & 0o777, 0o700)
 
     def test_native_maintenance_is_only_explicit(self):
         with patch.object(self.app, 'fetch'), patch.object(b, 'run', side_effect=self.fake_run), patch.object(b.platform, 'system', return_value='Linux'):
