@@ -73,6 +73,29 @@ def decode_request(value):
     return data, fingerprint
 
 
+def deploy_keys(repo):
+    endpoint = f'repos/{repo}/keys'
+    command = ['gh', 'api', endpoint, '--paginate', '--jq', '.[]']
+    result = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            timeout=600)
+    if result.returncode == 0:
+        return [json.loads(line) for line in result.stdout.splitlines()]
+    if 'unknown flag: --jq' not in result.stderr:
+        raise Error('Command failed: gh (see update log)')
+
+    pages = output(['gh', 'api', endpoint, '--paginate'])
+    decoder = json.JSONDecoder()
+    keys = []
+    while pages.strip():
+        pages = pages.lstrip()
+        page, end = decoder.raw_decode(pages)
+        if not isinstance(page, list):
+            raise Error('GitHub CLI returned an invalid deploy-key response.')
+        keys.extend(page)
+        pages = pages[end:]
+    return keys
+
+
 def official_installer(url, interpreter):
     # Caller obtains consent. Download to a file rather than piping into a shell.
     with tempfile.TemporaryDirectory() as temp:
@@ -128,8 +151,7 @@ def approve(app, value=None):
     visibility = json.loads(output(['gh', 'api', f"repos/{data['repo']}"]))
     if not visibility.get('private'):
         raise Error('Refusing enrollment into a public household repository.')
-    pages = json.loads(output(['gh', 'api', f"repos/{data['repo']}/keys", '--paginate', '--slurp']))
-    for key in (key for page in pages for key in page):
+    for key in deploy_keys(data['repo']):
         if key['key'].split()[:2] == data['key'].split():
             if not key['read_only']:
                 raise Error('Existing deploy key has write access. Revoke it and retry.')

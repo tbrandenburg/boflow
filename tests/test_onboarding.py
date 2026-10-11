@@ -47,9 +47,11 @@ class OnboardingTests(unittest.TestCase):
 
     def test_approval_is_read_only_and_private(self):
         with patch.object(o, 'consent'), patch.object(o, 'ensure_gh'), \
-                patch.object(o, 'output', side_effect=[json.dumps({'private': True}), '[]']), \
+                patch.object(o, 'output', return_value=json.dumps({'private': True})), \
+                patch.object(o, 'deploy_keys', return_value=[]) as deploy_keys, \
                 patch.object(o, 'run') as run:
             o.approve(self.app, o.request(self.app))
+            deploy_keys.assert_called_once_with('owner/home')
             args, kwargs = run.call_args
             self.assertIn('--input', args[0])
             self.assertIs(json.loads(kwargs['input'])['read_only'], True)
@@ -61,14 +63,38 @@ class OnboardingTests(unittest.TestCase):
 
     def test_repeat_approval_does_not_duplicate_and_refuses_write_access(self):
         for read_only in (True, False):
-            pages = json.dumps([[{'key': 'ssh-rsa unrelated', 'read_only': True}, {'key': KEY, 'read_only': read_only}]])
+            keys = '\n'.join(json.dumps(key) for key in (
+                {'key': 'ssh-rsa unrelated', 'read_only': True},
+                {'key': KEY, 'read_only': read_only},
+            ))
             with patch.object(o, 'consent'), patch.object(o, 'ensure_gh'), \
-                    patch.object(o, 'output', side_effect=['{"private":true}', pages]), \
+                    patch.object(o, 'output', return_value='{"private":true}'), \
+                    patch.object(o, 'deploy_keys', return_value=[json.loads(line) for line in keys.splitlines()]), \
                     patch.object(o, 'run') as run:
                 if read_only: o.approve(self.app, o.request(self.app))
                 else:
                     with self.assertRaises(b.Error): o.approve(self.app, o.request(self.app))
                 run.assert_not_called()
+
+    def test_deploy_key_listing_falls_back_when_jq_flag_is_unsupported(self):
+        failure = __import__('subprocess').CompletedProcess(
+            [], 2, '', 'unknown flag: --jq')
+        pages = json.dumps([{'key': 'first'}]) + '\n' + json.dumps([{'key': 'second'}])
+        with patch.object(o.subprocess, 'run', return_value=failure) as run, \
+                patch.object(o, 'output', return_value=pages) as output:
+            self.assertEqual(o.deploy_keys('owner/home'), [{'key': 'first'}, {'key': 'second'}])
+            self.assertEqual(run.call_args.args[0][3:], ['--paginate', '--jq', '.[]'])
+            self.assertEqual(output.call_args.args[0],
+                             ['gh', 'api', 'repos/owner/home/keys', '--paginate'])
+
+    def test_deploy_key_listing_does_not_hide_api_errors_as_compatibility(self):
+        failure = __import__('subprocess').CompletedProcess(
+            [], 1, '', 'HTTP 401: Bad credentials')
+        with patch.object(o.subprocess, 'run', return_value=failure), \
+                patch.object(o, 'output') as output:
+            with self.assertRaisesRegex(b.Error, 'Command failed: gh'):
+                o.deploy_keys('owner/home')
+            output.assert_not_called()
 
     def test_existing_member_resumes_without_enrollment_questions(self):
         self.app.settings['registered'] = True
