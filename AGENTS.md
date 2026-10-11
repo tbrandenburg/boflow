@@ -32,7 +32,7 @@ is separate and must never be reset by the updater.
 Start with `make setup`. Do not walk users through bootstrap/enroll/native/register
 as separate steps. Everyday Make commands: `setup`, `approve`, `open`, `status`,
 `update`, and `help`. Diagnostics: `doctor`, `logs`. Administrator/maintainer:
-`native` (`UPGRADE=1` for upgrades), `remove-user`, `export-managed-flows BOFLOW_DIR=...`,
+`native` (`BOFLOW_UPGRADE=1` for upgrades), `remove-user`, `export-managed-flows BOFLOW_DIR=...`,
 `lock BOFLOW_DIR=...`. Development: `check`. Removed Make wrappers: bootstrap, init-home,
 enroll, register-user, login, update-system-tools, and the redundant uninstall alias. The corresponding installed CLI
 commands remain for repair/internal startup; they are not an alternative onboarding.
@@ -173,7 +173,7 @@ Changing home.yml product_ref upgrades the product; use a full published commit
 SHA and keep schema 1. Node is an exact upstream version, Python is 3.12 in v1.
 After publishing, test one account before updating the others. Unknown schema or
 incompatible version: report it; no guessed migration. Native lists change during explicit setup or administrator native maintenance,
-never during login updates. `make native UPGRADE=1` explicitly upgrades them.
+never during login updates. `make native BOFLOW_UPGRADE=1` explicitly upgrades them.
 
 ## 7. Login and update
 
