@@ -16,7 +16,7 @@ Updates run at graphical login or on demand, without an always-on coordinator.
 
 ## What you get
 
-| Tool | Purpose | Default loopback port |
+| Tool | Purpose | Preferred loopback port |
 | --- | --- | --- |
 | Managed Node-RED | Runs published household flows | `11880` |
 | Personal Node-RED | Your flows, credentials, and extra palette modules | `11881` |
@@ -30,18 +30,13 @@ agent CLIs are separate prerequisites.
 
 ### How it fits together
 
-```text
-Public Boflow product          Private household repository
-  Python orchestrator           Flows + manifests + lockfiles
-  Native package playbook       Exact product commit pin
-             \                  /
-              Login / manual update
-                       |
-              Each participating account
-              ├── Managed Node-RED
-              ├── Personal Node-RED + local credentials
-              ├── JupyterLab + local notebooks
-              └── Account-local runtimes and CLI tools
+```mermaid
+flowchart TD
+  P[Public product] --> U[Account updater]
+  H[Private household repo] --> U
+  U --> M[Managed Node-RED]
+  U --> L[Personal Node-RED]
+  U --> J[JupyterLab]
 ```
 
 Dependencies are prepared before running services are interrupted. Unchanged
@@ -51,73 +46,65 @@ is manual; previous release caches are retained.
 
 ## Get started
 
-### Requirements
-
-- **Ubuntu x86_64/ARM64** or **macOS Intel/Apple Silicon**, with a graphical login.
-- Git, `make`, and [uv](https://docs.astral.sh/uv/getting-started/installation/).
-- Internet access for initial setup and updates.
-- Administrator: authenticated GitHub CLI for private repository creation.
-- macOS: Command Line Tools and a designated Homebrew owner.
-- Ubuntu: administrator-provisioned prerequisites and a running systemd user manager.
-
-Run account commands as the participating account. Keep its product checkout in
-place: the installed launcher references the bootstrap Python environment.
-
-### 1. Create the household repository — administrator
+From the participating account's graphical desktop terminal:
 
 ```sh
 git clone https://github.com/tbrandenburg/boflow.git
 cd boflow
-make bootstrap
-make init-home BOFLOW_REPO=OWNER/HOUSEHOLD BOFLOW_DIR="$HOME/my-household"
+make setup
 ```
 
-This copies missing starter files, pins the current product commit, creates a
-**private** repository, and pushes `main`. Existing public repositories are
-refused. Review the [starter configuration](/examples/household) before adding
-real household settings. Keep the authoring checkout separate from deployment.
+Choose **create** for the administrator's first machine or **join** for another
+account. Paste a household GitHub URL or `OWNER/NAME`. The guided setup offers to
+install missing uv/uvx and native tools, obtains administrator permission where
+necessary, creates the account's read-only deploy key, selects free ports, sets
+up login startup, verifies services, and opens your tools. Never run it as root.
+On a fresh Mac, Git/make require Apple's Command Line Tools; finish Apple's
+installation prompt before cloning. Homebrew's official installer is offered
+when needed; an existing Homebrew installation remains under its current owner.
 
-### 2. Enroll each account — member with administrator assistance
+**Create:** the administrator signs in through GitHub CLI's browser/device flow,
+confirms a private household repo and local working directory, and approves their
+own account key. Missing GitHub CLI is offered through apt/Homebrew. Git identity
+is set locally in the household checkout if absent; HTTPS Git authentication is
+configured through `gh auth setup-git`. No administrator token is sent to members.
 
-From an account-owned product checkout, run `make bootstrap`, then:
+**Join:** no GitHub login is required. Setup prints one PUBLIC `boflow1:` enrollment
+request. Share it with the administrator, who runs this from their Boflow checkout:
 
 ```sh
-make enroll BOFLOW_REPO=OWNER/HOUSEHOLD
+make approve
 ```
 
-The administrator adds the printed **public** key at the printed GitHub settings
-URL as a **read-only deploy key**. Leave “Allow write access” unchecked. The private
-key stays on this account; members do not need GitHub accounts. SSH accepts the
-first GitHub host key and pins it locally; preverified keys can be provisioned
-before enrollment where required.
+Approval uses the checkout's existing `.venv` without bootstrapping or updating
+the account launcher. If the environment is missing, it stops with instructions
+to run `uv sync --locked` here and retry. Use `make setup` for first-time account
+configuration.
 
-### 3. Install prerequisites and register — participating account
+The administrator pastes the request and verifies the household, account label,
+and public-key fingerprint before approving read-only access. Member setup checks
+for access for up to ten minutes and continues when available. Ctrl-C safely
+pauses it. Rerun `make setup` to resume; keys, settings, and personal data remain.
+Approval can also be repeated without adding duplicate keys. GitHub ties keys
+created through CLI authentication to that authorization: revoking it may remove
+these keys. Keep the administrator authorization active or register the same
+public keys through GitHub's repository settings if changing authentication.
 
-```sh
-make native          # Explicit admin authorization; Ubuntu prompts for sudo
-make register-user   # Ports 11880, 11881, 11882 by default
-make status
-make open
-```
+If another Mac account owns Homebrew, already installed packages are reused. When
+packages are missing, setup prints the exact `brew install` command for that owner;
+rerun setup in the member account afterward. No ownership changes or sudo brew.
+Ubuntu missing native packages request explicit installation consent and sudo.
+Local setup cannot remove those OS permission/ownership handoffs.
 
-On macOS, run native maintenance as the Homebrew owner. If another account owns
-Homebrew, have that owner install the declared packages separately and skip
-`make native` for the member. Do not change Homebrew ownership or run brew as root.
+GitHub SSH host keys use accept-new on first access, then remain pinned in local
+known_hosts. Preprovision independently verified host keys when required.
+Keep the product checkout in place: the installed launcher references its Python
+environment. The installed command is `~/.local/share/boflow/bin/boflow`.
 
-Registration prepares applications, installs login startup, starts three services,
-and checks their HTTP endpoints. `make status` should report them reachable and
-show the applied household/product commits. `make open` opens a private local
-link page, including authenticated Jupyter access.
-
-**Another account or a port conflict?** Choose a free block before registration:
-
-```sh
-make register-user BOFLOW_PORT_BASE=11980
-```
-
-Ports are preserved on reruns. The installed command is
-`$HOME/.local/share/boflow/bin/boflow`; it also accepts
-`register-user --port-base 11980`, overriding `BOFLOW_PORT_BASE`.
+`make help` lists everyday commands first: setup, approve, open, status, update.
+Diagnostics and maintenance are grouped separately. Low-level bootstrap, enroll,
+register, init-home, login, and the redundant uninstall alias are no longer Make targets; their implementation
+commands remain available to agents for repair through the installed CLI.
 
 ## Daily commands
 
@@ -125,14 +112,14 @@ Run these from the retained product checkout, or use the installed `boflow` CLI.
 
 | Make target | What it does |
 | --- | --- |
+| `make setup` | Guided create/join installation or resume |
+| `make approve` | Administrator approves a member request |
 | `make open` | Open the private local tool page |
 | `make status` | Show commits, update status, and reachable ports |
-| `make doctor` | Inspect platform and prerequisite availability |
 | `make update` | Fetch household `main` and apply its pinned product |
-| `make logs` | Show recent update output; inspect service logs privately |
-| `make native` | Explicitly install missing declared native packages |
-| `make update-system-tools` | Explicitly upgrade declared native packages |
-| `make uninstall` | Remove services/login startup and retain account data |
+
+Diagnostics (`doctor`, `logs`) and maintenance (`native`, `remove-user`,
+`export-managed-flows`, `lock`) are in the separate Make help group.
 
 At graphical login, installed services start before the update check. Offline
 login retains the installed services and records the failed check for diagnosis.
@@ -143,8 +130,7 @@ There is no periodic updater or OS upgrade job.
 | Input | Role |
 | --- | --- |
 | `BOFLOW_STATE` | Account state location; default `$HOME/.local/share/boflow` |
-| `BOFLOW_PORT_BASE` | First of three registration ports; default `11880` |
-| `BOFLOW_REPO` | Makefile household repository input: `OWNER/NAME` |
+| `BOFLOW_PORT_BASE` | Advanced low-level registration/test port override |
 | `BOFLOW_DIR` | Makefile household working-checkout input |
 | `BOFLOW_PYTHON` | Makefile interpreter override; defaults to the local venv if present |
 
@@ -191,7 +177,7 @@ Back up `personal/`, `notebooks/`, managed runtime context, `account.json`,
 `secrets.env`, and credential keys separately from Git. Stop services or use a
 consistent backup tool. Preserve credential keys to keep stored credentials usable.
 
-`make uninstall` (alias for `make remove-user`) removes services and login startup,
+`make remove-user` removes services and login startup,
 **preserving data, secrets, runtimes, and account state**. The administrator revokes
 the deploy key separately. Native packages remain installed. Release-cache cleanup
 and bad-release recovery are manual; use the [operating guide](/AGENTS.md#10-diagnose-repair-recover).
@@ -205,6 +191,8 @@ make check
 make acceptance BOFLOW_PORT_BASE=11880
 ```
 
+`make check` does not install native packages or startup jobs. `make acceptance`
+temporarily installs account services: run it explicitly in a disposable account.
 CI checks orchestration and application startup on Linux/macOS. The Ubuntu native
 roundtrip has been exercised with real user services: registration, authenticated
 application checks, unchanged updates, managed-only restart, offline login, and

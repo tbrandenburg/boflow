@@ -200,7 +200,7 @@ class App:
         run(['git', '-C', folder, 'checkout', '--detach', '--force', sha])
         return sha
 
-    def enroll(self, repo):
+    def enroll(self, repo, quiet=False):
         repo = repo_name(repo)
         if self.settings.get('repo') not in (None, repo):
             raise Error('Already enrolled in another household; remove enrollment first.')
@@ -211,10 +211,11 @@ class App:
         key.chmod(0o600)
         self.settings['repo'] = repo
         self.save()
-        print('Admin: register this PUBLIC key as a read-only deploy key:')
-        print(key.with_suffix('.pub').read_text())
-        print(f'https://github.com/{repo}/settings/keys')
-        print('Then run register-user. No private key needs to leave this account.')
+        if not quiet:
+            print('Admin: register this PUBLIC key as a read-only deploy key:')
+            print(key.with_suffix('.pub').read_text())
+            print(f'https://github.com/{repo}/settings/keys')
+            print('Then run register-user. No private key needs to leave this account.')
 
     def node(self, version):
         system = platform.system()
@@ -498,11 +499,18 @@ class App:
 
     @staticmethod
     def allocate_ports():
-        # Refuse a conflict; additional accounts choose an explicit port block.
-        base = 11880
-        ports = dict(zip(ROLES, range(base, base + 3)))
-        App.validate_ports(ports)
-        return ports
+        # Prefer familiar default ports, then search without touching listeners.
+        for base in range(11880, 50000, 3):
+            with contextlib.ExitStack() as stack:
+                try:
+                    for port in range(base, base + 3):
+                        sock = stack.enter_context(socket.socket())
+                        sock.bind(('127.0.0.1', port))
+                except OSError:
+                    continue
+                return dict(zip(ROLES, range(base, base + 3)))
+        raise Error('No free three-port block available for this account.')
+
 
     def health(self):
         for role, port in self.settings['ports'].items():
@@ -669,7 +677,7 @@ def init_home(repo, directory):
 def main():
     parser = argparse.ArgumentParser(description='Boflow: account-local household tools')
     sub = parser.add_subparsers(dest='command', required=True)
-    for cmd in ('install-launcher', 'update', 'login', 'status', 'doctor', 'logs', 'open', 'remove-user'):
+    for cmd in ('setup', 'approve', 'install-launcher', 'update', 'login', 'status', 'doctor', 'logs', 'open', 'remove-user'):
         sub.add_parser(cmd)
     p = sub.add_parser('register-user')
     p.add_argument('--port-base', type=int, default=os.environ.get('BOFLOW_PORT_BASE'),
@@ -691,7 +699,10 @@ def main():
         run(['uv', 'lock'], cwd=directory / 'jupyter')
         return
     app = App()
-    if args.command in ('update', 'login'):
+    if args.command in ('setup', 'approve'):
+        from onboarding import setup, approve
+        (setup if args.command == 'setup' else approve)(app)
+    elif args.command in ('update', 'login'):
         with (app.state / 'update.log').open('a') as log:
             # Capture dependencies' output; never print token-bearing Jupyter service logs.
             saved = (os.dup(1), os.dup(2))
@@ -739,8 +750,9 @@ def main():
 
 
 if __name__ == '__main__':
+    sys.modules['boflow'] = sys.modules[__name__]
     try:
         main()
-    except (Error, OSError, ValueError, KeyError) as exc:
+    except (Error, OSError, ValueError, KeyError, EOFError, KeyboardInterrupt) as exc:
         print(f'Boflow: {exc}', file=sys.stderr)
         sys.exit(1)

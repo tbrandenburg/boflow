@@ -22,81 +22,109 @@ ask users to paste secrets into chat. Never disable host-key checking.
 
 The installed command is `$HOME/.local/share/boflow/bin/boflow` (or the state
 chosen at bootstrap). Commands below use `boflow` for that executable. Makefile
-commands are equivalents from the product bootstrap checkout after `make bootstrap`.
+commands are equivalents from the product bootstrap checkout after `make setup`.
 The account updater fetches only household `main` and its pinned product commit.
 The private Git deployment checkout is disposable; the maintainer working checkout
 is separate and must never be reset by the updater.
 
-Boflow-owned configuration uses the BOFLOW_ namespace: BOFLOW_STATE selects state,
-BOFLOW_PORT_BASE selects initial ports, and Makefile inputs are BOFLOW_REPO,
-BOFLOW_DIR, and BOFLOW_PYTHON. Preserve external-tool/OS environment names.
-The CLI --port-base option takes precedence over BOFLOW_PORT_BASE.
+## Command choices
+
+Start with `make setup`. Do not walk users through bootstrap/enroll/native/register
+as separate steps. Everyday Make commands: `setup`, `approve`, `open`, `status`,
+`update`, and `help`. Diagnostics: `doctor`, `logs`. Administrator/maintainer:
+`native` (`BOFLOW_UPGRADE=1` for upgrades), `remove-user`, `export-managed-flows BOFLOW_DIR=...`,
+`lock BOFLOW_DIR=...`. Development: `check`. Removed Make wrappers: bootstrap, init-home,
+enroll, register-user, login, update-system-tools, and the redundant uninstall alias. The corresponding installed CLI
+commands remain for repair/internal startup; they are not an alternative onboarding.
+Boflow inputs use BOFLOW_: BOFLOW_STATE, BOFLOW_DIR, BOFLOW_PYTHON.
+BOFLOW_PORT_BASE/CLI --port-base remain for explicit low-level registration tests;
+guided setup chooses free ports automatically. Preserve OS/external-tool names.
+For developer environment setup without native changes: `uv sync --locked`.
 
 ## 1. Create a household (administrator)
 
-Prerequisites: Git, make, uv, GitHub CLI with authenticated repository-creation
-permission, and a product checkout. Inspect the intended local directory; do not
-use one containing private material unrelated to the starter.
+Prerequisites: product checkout owned by the participating account, Git/make,
+supported macOS/Ubuntu graphical session, initial internet access. A fresh Mac
+may need Apple's Command Line Tools prompt completed before Git/make work.
 
-1. `make bootstrap` creates the locked product Python environment and launcher.
-2. `make init-home BOFLOW_REPO=OWNER/NAME BOFLOW_DIR="$HOME/my-household"` populates starter files
-   only when missing, pins this product commit, creates a PRIVATE repo, and pushes main.
-3. Verify GitHub visibility is private, origin matches, starter lockfiles are present,
-   and the product commit is published/retrievable. A local unpushed commit is not deployable.
-4. Configure package lists and shared flows in the household working checkout.
+1. Run `make setup`, choose create, enter GitHub URL or OWNER/NAME.
+2. Wizard offers missing uv/uvx installation in ~/.local/bin without editing shell
+   files. It offers Homebrew if needed and gh through apt/Homebrew. Each installer
+   needs user consent; system password and GitHub browser/device sign-in are human
+   handoffs. Do not ask for passwords/tokens in chat.
+3. Confirm the private repository and separate household working directory. Starter
+   files only are copied; public existing repositories are refused. Existing dirty
+   household checkouts must be reviewed/committed explicitly, never auto-published.
+   Missing Git identity is set locally from the administrator's GitHub identity;
+   gh configures administrator HTTPS Git authentication. Product is pinned to this
+   checkout's full published commit. Do not use an unpushed local product commit.
+4. Confirm the account label and the displayed public-key fingerprint. The wizard
+   registers a read-only deploy key using the admin's GitHub access.
+5. Wizard offers missing native packages, registers startup/services, selects a free
+   port block, checks all endpoints, and opens the private tools page.
 
-Rerun: never overwrites existing files; resumes a private repo push. If authentication
-or repository creation fails, keep local files, authenticate through gh's human
-flow, inspect `git status`, and retry. Existing public repo: stop; do not push.
-The web alternative is creating a private repo manually, checking visibility, then
-pushing the explicitly reviewed starter files. No member needs a GitHub account.
+Verification: repository PRIVATE, matching origin, committed manifest/lockfiles,
+three reachable services, appropriate product pin. Rerun setup resumes; no key,
+personal data or secrets are discarded. Failed creation preserves starter files;
+rerun and choose the same repo/directory. Permission failure: authenticate with
+repository-administrator permissions and retry, never make the repo public.
 
-## 2. Bootstrap and enroll an account (admin-assisted)
+## 2. Join another account (member and administrator)
 
-Prerequisites: macOS/Ubuntu, supported CPU, internet for initial setup, account-owned
-product checkout. Mac needs Command Line Tools and a Homebrew owner; Ubuntu needs
-Git/make/uv provisioned by the administrator. Use `make bootstrap` as this account.
-If uv is absent, hand off installation using its official instructions; bootstrap
-never silently executes a downloaded installer. Keep this checkout in place.
+Run `make setup` in THAT account's graphical terminal, choose join, paste the
+household URL, and choose a short account label. No member GitHub account needed.
+Wizard generates an Ed25519 key, retains its private half locally, and prints a
+one-line PUBLIC `boflow1:` request containing repo, label, and public key only.
+Share the request through the household's normal communication channel.
 
-1. `boflow enroll --repo OWNER/NAME` generates an account-specific deploy key.
-2. Admin registers the printed PUBLIC key at the settings URL as read-only.
-3. The private key remains local; never copy it to household members or Git.
-4. Initial native setup: `boflow native` fetches config without preparing applications.
-   On Ubuntu the admin authorizes sudo. On Mac run it as the Homebrew owner, or have
-   that owner install the listed packages separately. Members do not take over brew.
+Administrator runs `make approve` in their configured product checkout, pastes the
+request, verifies the household/member label/fingerprint with the member, and
+confirms. A request targeting another household or public repo is refused. An
+already approved read-only key is reused; an existing write-enabled key is refused.
+This command can install missing gh with consent and guide admin sign-in.
+The Make target requires this checkout's prepared `.venv`; it never runs bootstrap,
+syncs dependencies, or installs/updates the launcher before approval. If `.venv`
+is absent, explicitly run `uv sync --locked` here and retry `make approve`.
+First-time account configuration still uses `make setup`.
+Do not auto-approve requests from an unverified source; labels are user supplied.
 
-Verification: fetch succeeds using the deploy key; installed native prerequisites
-exist. Rerun reuses the key and preserves configuration. Repo mismatch: inspect the
-existing enrollment rather than replacing it. Permission/network failure: register
-or repair read access and retry. SSH uses accept-new for the first github.com key,
-then pins it; preprovision independently verified known_hosts if required.
+Member setup retries access for up to ten minutes, then continues. Ctrl-C pauses;
+`make setup` resumes with the same key and repo. A timeout is not authorization:
+check approval, network, SSH host key and repository identity, then retry. Never
+copy private keys or administrator tokens to members. GitHub CLI authorization
+revocation may remove keys created through it; preserve admin authorization or
+register existing public keys manually through PRIVATE repo settings when changing
+it. If access is revoked later, use `boflow enroll --repo OWNER/NAME` to display
+existing public key, register it read-only again, then rerun setup/update.
 
-## 3. Register a household member
+SSH accepts a new github.com host key on first connection and pins it afterward.
+Use independently verified preprovisioned known_hosts when required; never disable
+host-key checking. Private deployment checkout is disposable, not authoring source.
 
-Prerequisites: completed account enrollment, prerequisites, a graphical login.
-Run `boflow register-user` from THAT account. It assigns a stable block
-of ports, prepares applications, generates stable local secrets, installs login
-startup, starts services, and verifies their HTTP endpoints.
+## 3. Finish setup, resume, and verify
 
-Expected: `boflow status` reports three reachable services and applied household/
-product commits; `boflow open` opens a private local link page. The empty initial
-flow has no dashboard until nodes are published. Rerun preserves personal data,
-extra palette packages, ports, credential keys, and notebooks.
+Wizard detects native prerequisites from the fetched household config. Ubuntu
+installation requests consent and sudo. Mac checks Command Line Tools and Homebrew
+formulae. Already installed native packages need no installation or ownership
+handoff. Missing packages under another Homebrew owner pause with that owner's
+exact `brew install` command; owner runs it, member reruns setup. Never change
+prefix ownership or use sudo brew. These permissions cannot be bypassed by an agent.
 
-Port conflict: stop, inspect listening ports, choose three unique ports in local
-account.json, and rerun. For an existing registration, remove its services before
-editing ports. Do not kill unrelated processes.
-For initial explicit selection use `make register-user BOFLOW_PORT_BASE=11880` or
-`boflow register-user --port-base 11880` (three consecutive ports).
-The default block is 11880–11882; additional accounts on one machine need a
-different free block.
-Failed preparation: read update/service logs locally; install missing native prerequisites explicitly.
-Partial registration can be resumed. Never claim completion if health checks fail.
+Registration chooses free account-local ports automatically, prepares applications,
+generates stable secrets, installs login startup, starts services, checks HTTP,
+and opens tools. Expected: `make status` shows three reachable services and applied
+commits. Empty initial flow has no dashboard until dashboard nodes are published.
+Rerunning preserves extra palette packages, flows, notebooks, ports, and keys.
+Saved ports are stable: later conflict requires inspecting listeners and explicitly
+removing services and choosing a free block in account.json; never kill unrelated processes. Initial
+port selection is a best-effort socket probe; a racing listener can still conflict.
 
-Linux XDG graphical autostart invokes login with session environment, then starts
-systemd user services. macOS uses LaunchAgents. An SSH-only initial session is not
-supported for registration. No linger/boot services are installed.
+Failed preparation: inspect local diagnostics, correct access/dependency/config,
+and rerun setup. Never claim completion if health checks fail. Enrollment and native
+installations already performed are retained after interruption, not rolled back.
+Linux graphical autostart invokes login with session environment and systemd user
+services; macOS uses LaunchAgents. No linger or boot services are installed.
+An SSH-only initial session is unsupported. setup checks the graphical session.
 
 ## 4. Open and use tools (member)
 
@@ -148,8 +176,8 @@ resolved by uv at installation (not a fully locked Python project).
 Changing home.yml product_ref upgrades the product; use a full published commit
 SHA and keep schema 1. Node is an exact upstream version, Python is 3.12 in v1.
 After publishing, test one account before updating the others. Unknown schema or
-incompatible version: report it; no guessed migration. Native lists change only
-when administrator runs native or native --upgrade, never in login updates.
+incompatible version: report it; no guessed migration. Native lists change during explicit setup or administrator native maintenance,
+never during login updates. `make native BOFLOW_UPGRADE=1` explicitly upgrades them.
 
 ## 7. Login and update
 
@@ -210,8 +238,7 @@ no automated rollback. Do not delete state to troubleshoot.
 ## 11. Remove member / retire machine
 
 As member: `boflow remove-user` unloads services/startup, marks account unregistered,
-and preserves ALL files. `make uninstall` is the equivalent Makefile target.
-Administrator separately revokes this deploy key in
+and preserves ALL files. Administrator separately revokes this deploy key in
 GitHub. Repeat for each enrolled account when retiring a machine. Revocation stops
 future fetches, not local services or previously downloaded data. Offline machines
 cannot be remotely cleaned. Delete personal data only with explicit authorization
@@ -223,15 +250,21 @@ existing deployment checkout/key. Local port selections must remain nonconflicti
 
 ## 12. Validate a release
 
-Run `uv sync --locked`, `make check`, and Ansible syntax-check. CI runs Linux/macOS
+Run `uv sync --locked`, `make check`, and Ansible syntax-check.
+`make check` never installs OS packages, startup jobs, or account services.
+Unit tests use temporary state; application smoke tests use temporary data and
+stop their processes. Native setup tests require disposable accounts/VMs; Docker
+can isolate applications but cannot validate macOS/Ubuntu graphical login services. CI runs Linux/macOS
 orchestration tests, not actual login enrollment. Then execute tests/acceptance.md
 on target machines with disposable accounts. Record actual OS/CPU versions and
 results. No production-ready or waterproof claim without those checks.
 
 `make acceptance BOFLOW_PORT_BASE=11880` runs the real Ubuntu service roundtrip
 with disposable local Git repositories, pinned runtimes, and application checks.
-It refuses existing service files/loaded units, validates ports, invokes
-`make uninstall`, verifies retained data, and deletes only its own test state.
+It refuses existing service files/loaded units, validates ports, invokes low-level
+registration/removal, verifies retained data, and deletes only its own test state.
 Requires a working systemd user manager. It does not test macOS native sessions,
 actual logout/reboot, simultaneous accounts, GitHub authorization, or native package
 consent. Report these boundaries rather than marking unexercised checklist items done.
+This target installs native account service files temporarily; run explicitly in
+an otherwise unused disposable account. It is never part of make check or CI.

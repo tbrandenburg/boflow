@@ -74,14 +74,14 @@ def main():
                'GIT_CONFIG_VALUE_1': b.PRODUCT_URL}
         registered = False
         try:
-            run(['make', 'bootstrap'], cwd=product, env=env)
+            run(['bash', 'bootstrap.sh'], cwd=product, env=env)
             launcher = state / 'bin/boflow'
             run([launcher, 'status'], env=env)
             run([launcher, 'doctor'], env=env)
             run([launcher, 'enroll', '--repo', 'acceptance/household'], env=env)
             registered = True  # Cleanup even if registration fails halfway.
             try:
-                run(['make', 'register-user', f'BOFLOW_PORT_BASE={args.port_base}'], cwd=product, env=env)
+                run([product / '.venv/bin/python', product / 'src/boflow.py', 'register-user', '--port-base', str(args.port_base)], cwd=product, env=env)
             except RuntimeError:
                 for role in b.ROLES:
                     print(role + ': ' + run(['systemctl', '--user', 'show', f'boflow-{role}.service',
@@ -115,7 +115,7 @@ def main():
             preserved = {path: path.read_bytes() for path in
                          (personal, notebook, state / 'personal/credential-key', state / 'jupyter-token')}
             before = pids()
-            run(['make', 'register-user', f'BOFLOW_PORT_BASE={args.port_base}'], cwd=product, env=env)
+            run([product / '.venv/bin/python', product / 'src/boflow.py', 'register-user', '--port-base', str(args.port_base)], cwd=product, env=env)
             run([launcher, 'update'], env=env)
             check()
             assert before == pids(), 'Unchanged update restarted a service'
@@ -139,16 +139,16 @@ def main():
             assert b.load_json(state / 'attempt.json')['stage'] == 'failed'
             print('Offline login retains live services and records failure: passed')
             run([launcher, 'update'], env=env)
-            run(['make', 'uninstall'], cwd=product, env=env)
+            run([product / '.venv/bin/python', product / 'src/boflow.py', 'remove-user'], cwd=product, env=env)
             assert not b.load_json(state / 'account.json')['registered']
             assert all(path.read_bytes() == data for path, data in preserved.items())
             assert not any(path.exists() for path in [*units, startup])
             b.App.validate_ports(ports)
-            print('Make uninstall removes startup/services, frees ports and preserves data: passed')
+            print('Removal removes startup/services, frees ports and preserves data: passed')
             registered = False
         finally:
             if registered:
-                run(['make', 'uninstall'], cwd=product, env=env)
+                run([product / '.venv/bin/python', product / 'src/boflow.py', 'remove-user'], cwd=product, env=env)
             for role in b.ROLES:
                 subprocess.run(['systemctl', '--user', 'reset-failed', f'boflow-{role}.service'],
                                capture_output=True, text=True, timeout=10)
