@@ -293,6 +293,9 @@ class App:
                     env={**os.environ, 'BOFLOW_STATE': str(self.state)}, timeout=1800)
             else:
                 self.apply(sha)
+            # A pinned-product subprocess owns activation and writes account state.
+            # Reload before registration or any subsequent save in this process.
+            self.settings = load_json(self.settings_path, {})
             write(self.state / 'attempt.json', json.dumps({'time': time.time(), 'stage': 'successful'}))
 
     def apply(self, sha):

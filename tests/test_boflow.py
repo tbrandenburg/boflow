@@ -83,6 +83,21 @@ class ConfigurationTests(Fixture):
 
 
 class UpdateTests(Fixture):
+    def test_pinned_product_activation_state_survives_parent_registration_save(self):
+        def child_activation(args, **kwargs):
+            state = b.load_json(self.app.settings_path)
+            state.update(node_path='/account/node', applied_commit='b' * 40,
+                         applied_product='a' * 40, last_success=123)
+            b.write(self.app.settings_path, json.dumps(state))
+            return subprocess.CompletedProcess(args, 0)
+        with patch.object(self.app, 'fetch', side_effect=['b' * 40, 'a' * 40]), patch.object(b, 'run', side_effect=child_activation):
+            self.app.update()
+        self.app.settings['registered'] = True
+        self.app.save()
+        saved = b.load_json(self.app.settings_path)
+        self.assertEqual(saved['node_path'], '/account/node')
+        self.assertEqual(saved['applied_commit'], 'b' * 40)
+
     def test_symlinked_state_path_is_canonical_and_idempotent(self):
         alias = self.root / 'state-alias'
         alias.symlink_to(self.app.state, target_is_directory=True)
