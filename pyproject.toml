@@ -1,0 +1,6 @@
+[project]
+name = "boflow"
+version = "0.1.0"
+description = "Small, account-local home computer management"
+requires-python = ">=3.12"
+dependencies = ["PyYAML==6.0.3", "ansible-core==2.19.3"]

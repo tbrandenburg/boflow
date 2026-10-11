@@ -1,0 +1,24 @@
+name: Check
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: uv sync --locked
+      - run: make check
+      - run: .venv/bin/ansible-playbook --syntax-check -i localhost, ansible/native.yml
+      - run: npm ci --no-audit --no-fund --prefix examples/household/node-red
+      - run: uv sync --locked --project examples/household/jupyter
+      - run: .venv/bin/python tests/smoke_apps.py

@@ -1,0 +1,2 @@
+# Persistent isolated CLI tools, one exact package version per line.
+# Example: ruff==0.14.0
