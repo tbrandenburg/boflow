@@ -3,6 +3,13 @@
 Record OS version, CPU, desktop/session type, product commit, and household commit.
 Run in disposable accounts before deploying to household accounts.
 
+`make acceptance BOFLOW_PORT_BASE=11880` exercises a disposable Ubuntu roundtrip with
+real Git fetches, pinned Node/application installs, and systemd user services.
+It checks registration, repeated registration/update, stable ports/data/secrets,
+managed-only restart, offline login, and `make uninstall`, then deletes its test
+state. Native package consent, GitHub key authorization, macOS sessions,
+simultaneous accounts, and logout/reboot remain separate checklist items below.
+
 - [ ] Create private household repo; verify visibility; rerun without overwrites.
 - [ ] Attempt initialization against public repo; verify push is refused.
 - [ ] Bootstrap Intel Mac, Apple Silicon Mac, and Ubuntu; document human prompts.

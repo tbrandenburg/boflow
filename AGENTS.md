@@ -27,6 +27,11 @@ The account updater fetches only household `main` and its pinned product commit.
 The private Git deployment checkout is disposable; the maintainer working checkout
 is separate and must never be reset by the updater.
 
+Boflow-owned configuration uses the BOFLOW_ namespace: BOFLOW_STATE selects state,
+BOFLOW_PORT_BASE selects initial ports, and Makefile inputs are BOFLOW_REPO,
+BOFLOW_DIR, and BOFLOW_PYTHON. Preserve external-tool/OS environment names.
+The CLI --port-base option takes precedence over BOFLOW_PORT_BASE.
+
 ## 1. Create a household (administrator)
 
 Prerequisites: Git, make, uv, GitHub CLI with authenticated repository-creation
@@ -34,7 +39,7 @@ permission, and a product checkout. Inspect the intended local directory; do not
 use one containing private material unrelated to the starter.
 
 1. `make bootstrap` creates the locked product Python environment and launcher.
-2. `make init-home REPO=OWNER/NAME DIR="$HOME/my-household"` populates starter files
+2. `make init-home BOFLOW_REPO=OWNER/NAME BOFLOW_DIR="$HOME/my-household"` populates starter files
    only when missing, pins this product commit, creates a PRIVATE repo, and pushes main.
 3. Verify GitHub visibility is private, origin matches, starter lockfiles are present,
    and the product commit is published/retrievable. A local unpushed commit is not deployable.
@@ -70,7 +75,7 @@ then pins it; preprovision independently verified known_hosts if required.
 ## 3. Register a household member
 
 Prerequisites: completed account enrollment, prerequisites, a graphical login.
-Run `boflow register-user` from THAT account. It assigns a stable disjoint block
+Run `boflow register-user` from THAT account. It assigns a stable block
 of ports, prepares applications, generates stable local secrets, installs login
 startup, starts services, and verifies their HTTP endpoints.
 
@@ -80,8 +85,13 @@ flow has no dashboard until nodes are published. Rerun preserves personal data,
 extra palette packages, ports, credential keys, and notebooks.
 
 Port conflict: stop, inspect listening ports, choose three unique ports in local
-account.json, and rerun. Do not kill unrelated processes. Failed preparation:
-read update/service logs locally; install missing native prerequisites explicitly.
+account.json, and rerun. For an existing registration, remove its services before
+editing ports. Do not kill unrelated processes.
+For initial explicit selection use `make register-user BOFLOW_PORT_BASE=11880` or
+`boflow register-user --port-base 11880` (three consecutive ports).
+The default block is 11880–11882; additional accounts on one machine need a
+different free block.
+Failed preparation: read update/service logs locally; install missing native prerequisites explicitly.
 Partial registration can be resumed. Never claim completion if health checks fail.
 
 Linux XDG graphical autostart invokes login with session environment, then starts
@@ -200,7 +210,8 @@ no automated rollback. Do not delete state to troubleshoot.
 ## 11. Remove member / retire machine
 
 As member: `boflow remove-user` unloads services/startup, marks account unregistered,
-and preserves ALL files. Administrator separately revokes this deploy key in
+and preserves ALL files. `make uninstall` is the equivalent Makefile target.
+Administrator separately revokes this deploy key in
 GitHub. Repeat for each enrolled account when retiring a machine. Revocation stops
 future fetches, not local services or previously downloaded data. Offline machines
 cannot be remotely cleaned. Delete personal data only with explicit authorization
@@ -216,3 +227,11 @@ Run `uv sync --locked`, `make check`, and Ansible syntax-check. CI runs Linux/ma
 orchestration tests, not actual login enrollment. Then execute tests/acceptance.md
 on target machines with disposable accounts. Record actual OS/CPU versions and
 results. No production-ready or waterproof claim without those checks.
+
+`make acceptance BOFLOW_PORT_BASE=11880` runs the real Ubuntu service roundtrip
+with disposable local Git repositories, pinned runtimes, and application checks.
+It refuses existing service files/loaded units, validates ports, invokes
+`make uninstall`, verifies retained data, and deletes only its own test state.
+Requires a working systemd user manager. It does not test macOS native sessions,
+actual logout/reboot, simultaneous accounts, GitHub authorization, or native package
+consent. Report these boundaries rather than marking unexercised checklist items done.

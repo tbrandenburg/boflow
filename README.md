@@ -1,164 +1,225 @@
 # Boflow
 
-A small product for keeping household computers useful without visiting each one.
-Boflow runs native Node-RED and JupyterLab services per account on macOS (Intel and
-Apple Silicon) and Ubuntu. A **private household GitHub repository** declares your
-shared flows and tools; this public repository contains only the product.
+**Shared household automation. Personal tools on each account.**
 
-**First release: implementation for review and machine validation.** Automated
-checks run locally and in CI. macOS login behavior and Ubuntu desktop sessions
-must be verified on your actual machines before treating this as unattended production setup.
+[![Check](https://github.com/tbrandenburg/boflow/actions/workflows/check.yml/badge.svg)](https://github.com/tbrandenburg/boflow/actions/workflows/check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](/LICENSE)
 
-## What each account gets
+Boflow installs and updates **Node-RED, JupyterLab, and CLI tools** for individual
+accounts on Ubuntu and macOS. Keep shared flows and pinned dependencies in one
+**private household GitHub repository**; each account keeps its own work and secrets.
+Updates run at graphical login or on demand, without an always-on coordinator.
 
-- Managed Node-RED flows and a centrally selected module list.
-- Separate personal Node-RED flows and palette additions that updates preserve.
-- JupyterLab, a Python kernel, and configurable Python packages.
-- Managed npm CLI tools and isolated Python CLI tools; uvx remains available.
-- Local access page, status, logs, and manual recovery procedures.
+[Get started](#get-started) · [Daily commands](#daily-commands) ·
+[Configuration](#configuration) · [Publish changes](#publish-household-changes) ·
+[Operating guide](/AGENTS.md) · [Validation](#development-and-validation)
 
-Initial Node-RED modules: Telegram, `@tbrandenburg/node-red-agents`, and
-`@flowfuse/node-red-dashboard`. No bot receiver or monitoring policy is enabled
-by default. The agents module's optional external CLIs and provider credentials
-are configured separately. The empty initial flow means a dashboard page appears
-only after you publish dashboard nodes.
+## What you get
 
-## Start as administrator
+| Tool | Purpose | Default loopback port |
+| --- | --- | --- |
+| Managed Node-RED | Runs published household flows | `11880` |
+| Personal Node-RED | Your flows, credentials, and extra palette modules | `11881` |
+| JupyterLab | Your notebooks and a managed Python 3.12 environment | `11882` |
+| npm / Python CLI tools | Household-selected tools in account-local releases | — |
 
-Install Git, `make`, and [uv](https://docs.astral.sh/uv/getting-started/installation/).
-On Mac install Apple's Command Line Tools (`xcode-select --install`) and Homebrew
-as the account designated to maintain it. Ubuntu's administrator installs these
-prerequisites with apt. Do not run Boflow bootstrap as root.
+The initial palette includes Telegram, `@tbrandenburg/node-red-agents`, and
+`@flowfuse/node-red-dashboard`. Publish dashboard nodes to create a dashboard;
+the starter flow is empty. Provider credentials, bot configuration, and optional
+agent CLIs are separate prerequisites.
+
+### How it fits together
+
+```text
+Public Boflow product          Private household repository
+  Python orchestrator           Flows + manifests + lockfiles
+  Native package playbook       Exact product commit pin
+             \                  /
+              Login / manual update
+                       |
+              Each participating account
+              ├── Managed Node-RED
+              ├── Personal Node-RED + local credentials
+              ├── JupyterLab + local notebooks
+              └── Account-local runtimes and CLI tools
+```
+
+Dependencies are prepared before running services are interrupted. Unchanged
+healthy services keep running; a shared-flow change restarts managed Node-RED
+only. Login updates never run sudo or Homebrew. Application activation recovery
+is manual; previous release caches are retained.
+
+## Get started
+
+### Requirements
+
+- **Ubuntu x86_64/ARM64** or **macOS Intel/Apple Silicon**, with a graphical login.
+- Git, `make`, and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+- Internet access for initial setup and updates.
+- Administrator: authenticated GitHub CLI for private repository creation.
+- macOS: Command Line Tools and a designated Homebrew owner.
+- Ubuntu: administrator-provisioned prerequisites and a running systemd user manager.
+
+Run account commands as the participating account. Keep its product checkout in
+place: the installed launcher references the bootstrap Python environment.
+
+### 1. Create the household repository — administrator
 
 ```sh
 git clone https://github.com/tbrandenburg/boflow.git
 cd boflow
 make bootstrap
-# GitHub CLI must be installed and authenticated for this admin command.
-make init-home REPO=YOUR-NAME/my-household DIR="$HOME/my-household"
+make init-home BOFLOW_REPO=OWNER/HOUSEHOLD BOFLOW_DIR="$HOME/my-household"
 ```
 
-`init-home` creates a **private** repository, copies starter configuration, pins
-the product to this checkout's exact commit, commits it, and pushes `main`.
-It refuses to push to an existing public repo. Review starter content before
-publishing any real configuration. Repo creation is an explicit command, never a
-side effect of member registration.
+This copies missing starter files, pins the current product commit, creates a
+**private** repository, and pushes `main`. Existing public repositories are
+refused. Review the [starter configuration](/examples/household) before adding
+real household settings. Keep the authoring checkout separate from deployment.
 
-## Enroll each participating account
+### 2. Enroll each account — member with administrator assistance
 
-Run bootstrap from a checkout owned by that account. Then:
+From an account-owned product checkout, run `make bootstrap`, then:
 
 ```sh
-make enroll REPO=YOUR-NAME/my-household
+make enroll BOFLOW_REPO=OWNER/HOUSEHOLD
 ```
 
-An administrator adds the printed **public** key at the printed GitHub settings
-URL. Leave **Allow write access** unchecked. The private key stays on that account.
-No member GitHub account is required. GitHub's SSH host key is accepted on first
-connection and then pinned in the account's known_hosts file; environments needing
-preverified host keys can provision that file before connecting.
+The administrator adds the printed **public** key at the printed GitHub settings
+URL as a **read-only deploy key**. Leave “Allow write access” unchecked. The private
+key stays on this account; members do not need GitHub accounts. SSH accepts the
+first GitHub host key and pins it locally; preverified keys can be provisioned
+before enrollment where required.
 
-Once authorized, perform explicit native setup as the administrator/package owner:
+### 3. Install prerequisites and register — participating account
 
 ```sh
-make native            # Ubuntu prompts for sudo; Homebrew runs without sudo
-make register-user     # run as the participating member in a desktop session
+make native          # Explicit admin authorization; Ubuntu prompts for sudo
+make register-user   # Ports 11880, 11881, 11882 by default
+make status
 make open
 ```
 
-On a Mac where a different account owns Homebrew, that owner installs the native
-packages listed in `home.yml` once; members skip `make native`. Never change the
-Homebrew prefix ownership or run brew under sudo to accommodate a member.
+On macOS, run native maintenance as the Homebrew owner. If another account owns
+Homebrew, have that owner install the declared packages separately and skip
+`make native` for the member. Do not change Homebrew ownership or run brew as root.
 
-The installed command is `~/.local/share/boflow/bin/boflow`. Add that directory
-and the paths printed in [AGENTS.md](AGENTS.md) to your shell PATH if desired.
-Keep the bootstrap checkout in place: the launcher references its Python environment.
+Registration prepares applications, installs login startup, starts three services,
+and checks their HTTP endpoints. `make status` should report them reachable and
+show the applied household/product commits. `make open` opens a private local
+link page, including authenticated Jupyter access.
 
-## Updates
-
-After each graphical login, installed services start, then an update check runs
-in the background. It fetches household `main` and the product commit pinned in
-`home.yml`, validates configuration, prepares dependencies, and restarts affected
-services. No periodic checks or OS upgrades run. Offline login leaves services
-using their installed configuration. Run `make update` for an immediate check.
-
-Native packages require `make native` (missing packages) or
-`make update-system-tools` (explicit upgrades). Login updates never invoke sudo
-or Homebrew. Native dependencies discovered during application preparation are
-reported through the failed preparation log; install them explicitly and retry.
-
-Each account is independent and has its own deploy key and update lock. No service
-runs as root. Personal data is outside both Git checkouts.
-
-## Publishing household changes
-
-Use the **personal** Node-RED instance on your designated authoring account.
-Export its flows into your separate household working checkout:
+**Another account or a port conflict?** Choose a free block before registration:
 
 ```sh
-make export-managed-flows DIR="$HOME/my-household"
-# Edit node-red/package.json, jupyter/pyproject.toml, or tools lists as needed.
-make lock DIR="$HOME/my-household"
-cd "$HOME/my-household"
-git diff
-# Stage named files; never indiscriminately add secrets or personal data.
-git add node-red/flows.json node-red/package.json node-red/package-lock.json
-git commit -m "Update shared automation"
-git push origin main
+make register-user BOFLOW_PORT_BASE=11980
 ```
 
-Publishing is the release decision. Export does not copy encrypted credentials;
-verify local secret references and all required node types before publishing.
-Managed-editor changes are temporary and may be replaced by the next flow update.
+Ports are preserved on reruns. The installed command is
+`$HOME/.local/share/boflow/bin/boflow`; it also accepts
+`register-user --port-base 11980`, overriding `BOFLOW_PORT_BASE`.
 
-## Access and privacy
+## Daily commands
 
-Applications bind only to `127.0.0.1`. The local access page includes a private
-Jupyter token so members do not enter a login. Do not share that file. Local
-Node-RED editors are unauthenticated: other users on the same machine can reach
-them. This is a cooperative, mutually trusted household setup, not user isolation
-or tamper-resistant enforcement.
+Run these from the retained product checkout, or use the installed `boflow` CLI.
 
-Remote administration uses SSH tunnels. Enable OS SSH access explicitly, discover
-ports through `make status`, and forward them (example port only):
+| Make target | What it does |
+| --- | --- |
+| `make open` | Open the private local tool page |
+| `make status` | Show commits, update status, and reachable ports |
+| `make doctor` | Inspect platform and prerequisite availability |
+| `make update` | Fetch household `main` and apply its pinned product |
+| `make logs` | Show recent update output; inspect service logs privately |
+| `make native` | Explicitly install missing declared native packages |
+| `make update-system-tools` | Explicitly upgrade declared native packages |
+| `make uninstall` | Remove services/login startup and retain account data |
+
+At graphical login, installed services start before the update check. Offline
+login retains the installed services and records the failed check for diagnosis.
+There is no periodic updater or OS upgrade job.
+
+## Configuration
+
+| Input | Role |
+| --- | --- |
+| `BOFLOW_STATE` | Account state location; default `$HOME/.local/share/boflow` |
+| `BOFLOW_PORT_BASE` | First of three registration ports; default `11880` |
+| `BOFLOW_REPO` | Makefile household repository input: `OWNER/NAME` |
+| `BOFLOW_DIR` | Makefile household working-checkout input |
+| `BOFLOW_PYTHON` | Makefile interpreter override; defaults to the local venv if present |
+
+Boflow-owned inputs use `BOFLOW_`. External tools and the OS retain their required
+environment names. Set `BOFLOW_STATE` consistently when using a custom installation.
+
+The private repository contains `home.yml`, Node-RED/npm manifests and lockfiles,
+Jupyter's `pyproject.toml`/`uv.lock`, and `tools/python-tools.txt`. Use exact direct
+versions and a full published product commit SHA. Python is 3.12 in v1. Python CLI
+tools pin direct versions; uv resolves their transitive dependencies at install time.
+Optional account-local `local.yml` overrides native package lists only.
+
+## Publish household changes
+
+Author shared flows in the maintainer's **personal** Node-RED, then export into
+the separate private household working checkout:
 
 ```sh
-ssh -L 23000:127.0.0.1:23000 alice@PC-IP
+make export-managed-flows BOFLOW_DIR="$HOME/my-household"
+# Edit manifests/tool lists as needed, then refresh locks.
+make lock BOFLOW_DIR="$HOME/my-household"
 ```
 
-Open localhost port 23000 on your admin computer. For Jupyter retrieve its token
-privately from that account or use Jupyter's password setup. Remote notebook/flow
-editing grants execution as the target account. There is no LAN gateway or SSO.
+In that household checkout, review `git diff`, stage named files, commit, and push
+`main`. Publish manifests **with** their lockfiles. Members receive the change at
+next login or manual update. Test one account before updating the others.
 
-## Configuration and data
+Export strips inline credentials; encrypted credentials remain local. Verify
+secret references, required nodes, platform-specific commands, and scheduled
+side effects before publishing. Managed-editor changes may be replaced by a
+later shared-flow update. See the [publishing guide](/AGENTS.md#5-publish-shared-flows-maintainer).
 
-Household config is `home.yml` plus manifests/lockfiles in `node-red/`, `jupyter/`,
-and `tools/`. Optional account-local `~/.local/share/boflow/local.yml` overrides
-**native package lists only**; no host inventory is required. See the examples.
+## Access, backup, and removal
 
-State resides at `~/.local/share/boflow/` (mode 0700), configurable via
-`BOFLOW_STATE` when bootstrapping. `account.json` holds stable ports, repo identity,
-and update status. `personal/`, `managed/`, and `notebooks/` hold account data;
-`secrets.env` contains optional `KEY=value` values without shell expansion.
-Jupyter token and Node-RED credential keys are generated once and retained.
+Services bind to `127.0.0.1`. Node-RED is unauthenticated and reachable by other
+local accounts: this is a trusted-household setup. The private local page contains
+the Jupyter token; do not publish it or paste raw service logs into shared channels.
 
-Back up personal data, notebooks, and credential keys separately from Git.
-Application release caches are retained for diagnosis; monitor disk space and
-remove unused releases manually only after stopping services and inspecting
-current symlink targets. Automatic cache pruning is outside v1.
+For remote administration, explicitly enable OS SSH and forward the relevant
+account port, for example `ssh -L 11880:127.0.0.1:11880 ACCOUNT@IP`. Remote notebook
+or flow editing executes code as that account. No LAN gateway or SSO is provided.
 
-## Maintenance
+Back up `personal/`, `notebooks/`, managed runtime context, `account.json`,
+`secrets.env`, and credential keys separately from Git. Stop services or use a
+consistent backup tool. Preserve credential keys to keep stored credentials usable.
 
-`make status`, `make doctor`, `make logs`, `make update`, and `make remove-user`
-cover normal operation. Removal stops startup/services and **retains all data**;
-the administrator revokes the deploy key separately. Recovery is manual, not
-automatic rollback.
+`make uninstall` (alias for `make remove-user`) removes services and login startup,
+**preserving data, secrets, runtimes, and account state**. The administrator revokes
+the deploy key separately. Native packages remain installed. Release-cache cleanup
+and bad-release recovery are manual; use the [operating guide](/AGENTS.md#10-diagnose-repair-recover).
 
-[AGENTS.md](AGENTS.md) documents all journeys, expected results, recovery, and
-human handoffs. [SCOPE.md](SCOPE.md) defines the finish line. For development:
+## Development and validation
 
 ```sh
 uv sync --locked
 make check
 .venv/bin/ansible-playbook --syntax-check -i localhost, ansible/native.yml
+make acceptance BOFLOW_PORT_BASE=11880
 ```
+
+CI checks orchestration and application startup on Linux/macOS. The Ubuntu native
+roundtrip has been exercised with real user services: registration, authenticated
+application checks, unchanged updates, managed-only restart, offline login, and
+uninstall. `make acceptance` uses disposable local Git repositories and removes
+its test state; it requires no existing Boflow service files and a working user manager.
+
+Actual logout/reboot, macOS native sessions, simultaneous accounts, GitHub key
+authorization, and administrator package consent need separate target-machine
+checks. Follow [tests/acceptance.md](/tests/acceptance.md) before unattended deployment.
+
+Contributions should follow [SCOPE.md](/SCOPE.md) and [AGENTS.md](/AGENTS.md).
+Open an [issue](https://github.com/tbrandenburg/boflow/issues) for bugs or scope
+proposals; keep private configuration and logs out of reports. Extra ideas live
+in [BACKLOG.md](/BACKLOG.md).
+
+## License
+
+[MIT](/LICENSE).

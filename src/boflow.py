@@ -192,7 +192,7 @@ class App:
             folder.mkdir(parents=True, exist_ok=True)
             run(['git', 'init', folder])
             run(['git', '-C', folder, 'remote', 'add', 'origin', url])
-        actual = output(['git', '-C', folder, 'remote', 'get-url', 'origin'])
+        actual = output(['git', '-C', folder, 'config', '--get', 'remote.origin.url'])
         if actual != url:
             raise Error('Deployment checkout has a different origin; inspect it first.')
         run(['git', '-C', folder, 'fetch', '--depth=1', 'origin', ref], env=env, timeout=90)
@@ -438,12 +438,18 @@ class App:
         if platform.system() != 'Darwin':
             run(['systemctl', '--user', 'daemon-reload'])
 
-    def register(self):
+    def register(self, port_base=None):
         if not self.settings.get('repo'):
             raise Error('Run enroll and authorize its deploy key first.')
+        ports = (dict(zip(ROLES, range(port_base, port_base + 3)))
+                 if port_base is not None else self.settings.get('ports'))
+        if self.settings.get('ports') and ports != self.settings['ports']:
+            raise Error('Existing ports differ; remove services, then edit account.json before retrying.')
+        if ports is not None:
+            self.validate_ports(ports, check_available=not self.settings.get('registered'))
         self.install_launcher()
         if not self.settings.get('ports'):
-            self.settings['ports'] = self.allocate_ports()
+            self.settings['ports'] = ports if ports is not None else self.allocate_ports()
             self.save()
         # First setup prepares applications before installing login startup.
         self.update()
@@ -469,21 +475,40 @@ class App:
         print('Registration complete. Run boflow open to access your tools.')
 
     @staticmethod
-    def allocate_ports():
-        # Disjoint blocks for normal local UIDs. Refuse a conflict, never steal a port.
-        base = 20000 + (os.getuid() % 10000) * 3
-        ports = dict(zip(ROLES, range(base, base + 3)))
-        for port in ports.values():
-            with socket.socket() as sock:
+    def validate_ports(ports, check_available=True):
+        if (set(ports) != set(ROLES) or
+                any(type(port) is not int or not 1024 <= port <= 65535 for port in ports.values()) or
+                len(set(ports.values())) != len(ROLES)):
+            raise Error('Choose three distinct unprivileged ports between 1024 and 65535.')
+        if not check_available:
+            return
+        sockets = []
+        try:
+            for port in ports.values():
+                sock = socket.socket()
+                sockets.append(sock)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
                     sock.bind(('127.0.0.1', port))
                 except OSError as exc:
-                    raise Error('Assigned port is occupied. Set explicit ports in account.json.') from exc
+                    raise Error(f'Port {port} is occupied; choose another port block.') from exc
+        finally:
+            for sock in sockets:
+                sock.close()
+
+    @staticmethod
+    def allocate_ports():
+        # Refuse a conflict; additional accounts choose an explicit port block.
+        base = 11880
+        ports = dict(zip(ROLES, range(base, base + 3)))
+        App.validate_ports(ports)
         return ports
 
     def health(self):
         for role, port in self.settings['ports'].items():
-            for attempt in range(40):
+            # Native palette/kernel startup can be slow on a busy target machine.
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
                 try:
                     with urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=2) as response:
                         if response.status == 200:
@@ -644,8 +669,11 @@ def init_home(repo, directory):
 def main():
     parser = argparse.ArgumentParser(description='Boflow: account-local household tools')
     sub = parser.add_subparsers(dest='command', required=True)
-    for cmd in ('install-launcher', 'register-user', 'update', 'login', 'status', 'doctor', 'logs', 'open', 'remove-user'):
+    for cmd in ('install-launcher', 'update', 'login', 'status', 'doctor', 'logs', 'open', 'remove-user'):
         sub.add_parser(cmd)
+    p = sub.add_parser('register-user')
+    p.add_argument('--port-base', type=int, default=os.environ.get('BOFLOW_PORT_BASE'),
+                   help='First of three consecutive loopback ports (BOFLOW_PORT_BASE); preserved on reruns')
     p = sub.add_parser('init-home'); p.add_argument('--repo', required=True); p.add_argument('--directory', required=True)
     p = sub.add_parser('enroll'); p.add_argument('--repo', required=True)
     p = sub.add_parser('native'); p.add_argument('--upgrade', action='store_true')
@@ -681,7 +709,7 @@ def main():
                 os.dup2(saved[0], 1); os.dup2(saved[1], 2)
                 os.close(saved[0]); os.close(saved[1])
         print('Update complete; run status for details.')
-    elif args.command == 'register-user': app.register()
+    elif args.command == 'register-user': app.register(args.port_base)
     elif args.command == 'install-launcher': app.install_launcher()
     elif args.command == 'enroll': app.enroll(args.repo)
     elif args.command == 'apply': app.apply(args.commit)

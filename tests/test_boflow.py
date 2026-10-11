@@ -178,6 +178,45 @@ class UpdateTests(Fixture):
 
 
 class NativeAndAccessTests(Fixture):
+    def test_namespaced_port_environment_and_cli_precedence(self):
+        with patch.dict(b.os.environ, {'BOFLOW_PORT_BASE': '11880'}), patch.object(b, 'App', return_value=self.app), patch.object(self.app, 'register') as register:
+            with patch.object(b.sys, 'argv', ['boflow', 'register-user']):
+                b.main()
+            register.assert_called_with(11880)
+            with patch.object(b.sys, 'argv', ['boflow', 'register-user', '--port-base', '11980']):
+                b.main()
+            register.assert_called_with(11980)
+            with patch.dict(b.os.environ, {'BOFLOW_PORT_BASE': 'invalid'}), patch.object(b.sys, 'argv', ['boflow', 'register-user']), patch.object(b.sys, 'stderr'):
+                with self.assertRaises(SystemExit) as error:
+                    b.main()
+                self.assertEqual(error.exception.code, 2)
+
+    def test_invalid_and_conflicting_ports_are_rejected_before_registration(self):
+        self.app.settings.pop('ports')
+        for base in (0, 1023, 65534):
+            with self.assertRaises(b.Error):
+                self.app.register(base)
+        for ports in ({'managed': 11880}, dict(zip(b.ROLES, [11880, 11880, 11882])),
+                      dict(zip(b.ROLES, [True, 11881, 11882]))):
+            with self.assertRaises(b.Error):
+                b.App.validate_ports(ports)
+        with socket.socket() as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(('127.0.0.1', 0))
+            sock.listen()
+            ports = dict(zip(b.ROLES, [sock.getsockname()[1], 11881, 11882]))
+            with self.assertRaisesRegex(b.Error, 'occupied'):
+                b.App.validate_ports(ports)
+
+    def test_explicit_ports_are_preserved_and_cannot_change_on_rerun(self):
+        self.app.settings.pop('ports')
+        with patch.object(self.app, 'update'), patch.object(self.app, 'install_launcher'), patch.object(self.app, 'install_services'), patch.object(self.app, 'service'), patch.object(self.app, 'health'), patch.object(self.app, 'landing'), patch.object(b, 'write'):
+            self.app.register(11880)
+            self.app.register()
+            self.assertEqual(self.app.settings['ports'], dict(zip(b.ROLES, [11880, 11881, 11882])))
+            with self.assertRaisesRegex(b.Error, 'differ'):
+                self.app.register(11980)
+
     def test_generated_node_red_settings_are_loopback_only_and_use_stable_secret(self):
         self.apply()
         with patch.object(b.os, 'execvpe') as execute:
@@ -217,10 +256,8 @@ class NativeAndAccessTests(Fixture):
         self.assertTrue((self.app.state / 'personal/flows.json').exists())
         self.assertTrue((self.app.state / 'personal/credential-key').exists())
 
-    def test_two_uids_get_distinct_port_blocks(self):
-        with patch.object(b.os, 'getuid', return_value=1401): a = b.App.allocate_ports()
-        with patch.object(b.os, 'getuid', return_value=1402): c = b.App.allocate_ports()
-        self.assertTrue(set(a.values()).isdisjoint(c.values()))
+    def test_default_ports_start_at_11880(self):
+        self.assertEqual(b.App.allocate_ports(), dict(zip(b.ROLES, [11880, 11881, 11882])))
 
 
 class GitCheckoutTests(Fixture):
