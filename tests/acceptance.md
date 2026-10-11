@@ -6,13 +6,19 @@ Run in disposable accounts before deploying to household accounts.
 `make acceptance BOFLOW_PORT_BASE=11880` exercises a disposable Ubuntu roundtrip with
 real Git fetches, pinned Node/application installs, and systemd user services.
 It checks registration, repeated registration/update, stable ports/data/secrets,
-managed-only restart, offline login, and `make uninstall`, then deletes its test
+managed-only restart, offline login, and low-level account removal, then deletes its test
 state. Native package consent, GitHub key authorization, macOS sessions,
 simultaneous accounts, and logout/reboot remain separate checklist items below.
 
 - [ ] Create private household repo; verify visibility; rerun without overwrites.
 - [ ] Attempt initialization against public repo; verify push is refused.
-- [ ] Bootstrap Intel Mac, Apple Silicon Mac, and Ubuntu; document human prompts.
+- [ ] Fresh make setup on Intel Mac, Apple Silicon Mac, Ubuntu without uv; document prompts.
+- [ ] Create journey installs gh when missing and sets local Git identity when absent.
+- [ ] Join needs no GitHub login; admin make approve verifies request and grants read-only access.
+- [ ] Interrupt while awaiting approval; rerun setup reuses the same key/label/repo.
+- [ ] Repeat approval reuses key; cross-household/public/write-enabled keys refused.
+- [ ] Mac non-owner reuses installed packages; missing packages print owner handoff.
+- [ ] Occupy preferred initial port; setup selects another block without touching listener.
 - [ ] Enroll deploy key; verify denied access before authorization and success after.
 - [ ] Explicit native setup works under correct owner; login never requests sudo.
 - [ ] Register account in graphical session; all endpoints pass checks.

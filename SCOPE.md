@@ -8,7 +8,8 @@ claim of compatibility with every OS release. Unsupported platforms fail clearly
 
 - Public product repo; easy creation of a separate private household repo.
 - Exact product commit pin; schema 1 household configuration.
-- Account bootstrap and manual administrator authorization of read-only deploy keys.
+- One guided setup command, resumable enrollment, and reviewed administrator
+  approval of read-only deploy keys without member GitHub accounts.
 - Explicit Ansible native package installation/upgrade; no unattended sudo.
 - Pinned account-local Node distribution with HTTPS checksum verification.
 - Managed/personal Node-RED, Jupyter Python 3.12, npm and Python CLI tool lists.
@@ -28,6 +29,8 @@ claim of compatibility with every OS release. Unsupported platforms fail clearly
 9. Private repo creation refuses public existing repositories.
 10. Removing services retains data and documents deploy-key revocation.
 11. All setup/removal/recovery journeys are documented and exercised.
+12. Guided setup handles missing prerequisites with consent and chooses free ports;
+    repeated approval never duplicates keys or grants write access.
 
 Automated tests cover orchestration and failure boundaries; real native session,
 permission, hardware, and application checks are required on target machines.

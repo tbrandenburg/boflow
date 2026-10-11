@@ -1,42 +1,24 @@
 BOFLOW_PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 BOFLOW := $(BOFLOW_PYTHON) src/boflow.py
-.PHONY: help bootstrap init-home enroll register-user update login native update-system-tools status doctor logs open export-managed-flows lock check remove-user uninstall acceptance
+.DEFAULT_GOAL := help
+.PHONY: help setup approve open status update doctor logs native remove-user export-managed-flows lock check acceptance
 help:
-	@$(BOFLOW) --help
-bootstrap:
+	@printf '%s\n' 'Everyday:' '  setup    Guided installation or resume (create/join household)' '  approve  Admin approves a member’s public enrollment request' '  open     Open your tools' '  status   Service and update status' '  update   Check household updates now' '' 'Maintenance (see AGENTS.md):' '  doctor / logs       Diagnose problems locally' '  native              Install missing native packages; UPGRADE=1 upgrades' '  remove-user         Remove startup; retain all data' '  export-managed-flows / lock BOFLOW_DIR=...   Prepare household changes' '  check               Developer checks; no native installation' '  acceptance          Explicit Ubuntu native roundtrip on disposable account'
+setup:
+	@bash setup.sh
+approve:
 	@bash bootstrap.sh
-init-home:
-	@$(BOFLOW) init-home --repo "$(BOFLOW_REPO)" --directory "$(BOFLOW_DIR)"
-enroll:
-	@$(BOFLOW) enroll --repo "$(BOFLOW_REPO)"
-register-user:
-	@$(BOFLOW) register-user $(if $(BOFLOW_PORT_BASE),--port-base "$(BOFLOW_PORT_BASE)")
-update:
-	@$(BOFLOW) update
-login:
-	@$(BOFLOW) login
+	@.venv/bin/python src/boflow.py approve
+open status update doctor logs remove-user:
+	@$(BOFLOW) $@
 native:
-	@$(BOFLOW) native
-update-system-tools:
-	@$(BOFLOW) native --upgrade
-status:
-	@$(BOFLOW) status
-doctor:
-	@$(BOFLOW) doctor
-logs:
-	@$(BOFLOW) logs
-open:
-	@$(BOFLOW) open
-export-managed-flows:
-	@$(BOFLOW) export-managed-flows --directory "$(BOFLOW_DIR)"
-lock:
-	@$(BOFLOW) lock --directory "$(BOFLOW_DIR)"
-remove-user:
-	@$(BOFLOW) remove-user
-uninstall: remove-user
-acceptance:
-	@$(BOFLOW_PYTHON) tests/native_roundtrip.py --port-base "$(or $(BOFLOW_PORT_BASE),11880)"
+	@$(BOFLOW) native $(if $(filter 1,$(UPGRADE)),--upgrade,)
+export-managed-flows lock:
+	@$(BOFLOW) $@ --directory "$(BOFLOW_DIR)"
 check:
 	@$(BOFLOW_PYTHON) -m unittest discover -s tests -v
 	@$(BOFLOW_PYTHON) -m compileall -q src tests
-	@bash -n bootstrap.sh
+	@bash -n bootstrap.sh setup.sh
+
+acceptance:
+	@$(BOFLOW_PYTHON) tests/native_roundtrip.py --port-base "$(or $(BOFLOW_PORT_BASE),11880)"
