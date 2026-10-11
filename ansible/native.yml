@@ -1,0 +1,37 @@
+---
+- name: Explicit native prerequisite maintenance
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: Install declared Ubuntu packages
+      ansible.builtin.apt:
+        name: "{{ native.ubuntu }}"
+        state: "{{ 'latest' if upgrade_native | default(false) else 'present' }}"
+        update_cache: true
+      become: true
+      when: ansible_facts['distribution'] == 'Ubuntu'
+    - name: Check macOS developer tools
+      ansible.builtin.command: xcode-select -p
+      changed_when: false
+      when: ansible_facts['system'] == 'Darwin'
+    - name: Read installed Homebrew packages
+      ansible.builtin.command: brew list --formula -1
+      register: brew_packages
+      changed_when: false
+      when: ansible_facts['system'] == 'Darwin'
+    - name: Install missing Homebrew packages as its owner
+      ansible.builtin.command:
+        argv: "{{ ['brew', 'install', item] }}"
+      loop: "{{ native.macos }}"
+      when:
+        - ansible_facts['system'] == 'Darwin'
+        - item not in brew_packages.stdout_lines
+      changed_when: true
+    - name: Upgrade explicitly declared Homebrew packages
+      ansible.builtin.command:
+        argv: "{{ ['brew', 'upgrade'] + native.macos }}"
+      when:
+        - ansible_facts['system'] == 'Darwin'
+        - upgrade_native | default(false) | bool
+      changed_when: true

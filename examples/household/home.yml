@@ -1,0 +1,8 @@
+schema: 1
+# init-home replaces this with the product checkout's exact commit.
+product_ref: REPLACE_WITH_PRODUCT_COMMIT
+python: '3.12'
+node: '24.21.0'
+native:
+  ubuntu: [git, build-essential, pkg-config, cmake]
+  macos: [git, pkg-config, cmake]
