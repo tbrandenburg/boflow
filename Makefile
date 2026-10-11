@@ -7,7 +7,7 @@ help:
 setup:
 	@bash setup.sh
 approve:
-	@bash bootstrap.sh
+	@test -x .venv/bin/python || { printf '%s\n' 'Boflow approval needs a prepared .venv. Run uv sync --locked in this checkout, then retry make approve. For first-time account setup, run make setup.' >&2; exit 1; }
 	@.venv/bin/python src/boflow.py approve
 open status update doctor logs remove-user:
 	@$(BOFLOW) $@

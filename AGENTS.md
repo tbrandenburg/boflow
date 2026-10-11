@@ -82,6 +82,10 @@ request, verifies the household/member label/fingerprint with the member, and
 confirms. A request targeting another household or public repo is refused. An
 already approved read-only key is reused; an existing write-enabled key is refused.
 This command can install missing gh with consent and guide admin sign-in.
+The Make target requires this checkout's prepared `.venv`; it never runs bootstrap,
+syncs dependencies, or installs/updates the launcher before approval. If `.venv`
+is absent, explicitly run `uv sync --locked` here and retry `make approve`.
+First-time account configuration still uses `make setup`.
 Do not auto-approve requests from an unverified source; labels are user supplied.
 
 Member setup retries access for up to ten minutes, then continues. Ctrl-C pauses;

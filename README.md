@@ -76,6 +76,11 @@ request. Share it with the administrator, who runs this from their Boflow checko
 make approve
 ```
 
+Approval uses the checkout's existing `.venv` without bootstrapping or updating
+the account launcher. If the environment is missing, it stops with instructions
+to run `uv sync --locked` here and retry. Use `make setup` for first-time account
+configuration.
+
 The administrator pastes the request and verifies the household, account label,
 and public-key fingerprint before approving read-only access. Member setup checks
 for access for up to ten minutes and continues when available. Ctrl-C safely
