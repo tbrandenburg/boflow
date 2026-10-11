@@ -83,6 +83,16 @@ class ConfigurationTests(Fixture):
 
 
 class UpdateTests(Fixture):
+    def test_symlinked_state_path_is_canonical_and_idempotent(self):
+        alias = self.root / 'state-alias'
+        alias.symlink_to(self.app.state, target_is_directory=True)
+        self.app = b.App(alias)
+        self.assertEqual(self.app.state, alias.resolve())
+        self.apply()
+        self.calls.clear()
+        self.apply()
+        self.assertEqual(self.calls, [])
+
     def test_repeat_apply_preserves_data_and_never_reinstalls(self):
         self.apply()
         personal = self.app.state / 'personal'

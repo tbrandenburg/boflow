@@ -148,7 +148,7 @@ def digest(*paths):
 class App:
     def __init__(self, state=None):
         self.state = Path(state or os.environ.get('BOFLOW_STATE',
-                         str(Path.home() / '.local/share/boflow'))).expanduser().absolute()
+                         str(Path.home() / '.local/share/boflow'))).expanduser().resolve()
         self.state.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.state.chmod(0o700)
         self.settings_path = self.state / 'account.json'
