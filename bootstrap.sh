@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 product_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "$(id -u)" == 0 ]]; then
   echo 'Run bootstrap as the participating account, not root.' >&2
@@ -19,4 +20,4 @@ umask 077
 mkdir -p "$state_dir/bin"
 uv sync --locked --project "$product_dir"
 "$product_dir/.venv/bin/python" "$product_dir/src/boflow.py" install-launcher
-printf 'Installed. Next: %s/bin/boflow enroll --repo OWNER/PRIVATE-REPO\n' "$state_dir"
+printf 'Boflow environment ready.\n'
